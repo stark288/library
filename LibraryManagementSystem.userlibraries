@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<eclipse-userlibraries>
+  <library name="Maven: junit:junit:3.8.1">
+    <archive path="C:/Users/gcs21/.m2/repository/junit/junit/3.8.1/junit-3.8.1.jar" />
+  </library>
+  <library name="Maven: com.oracle.database.jdbc:ojdbc10:19.22.0.0">
+    <archive path="C:/Users/gcs21/.m2/repository/com/oracle/database/jdbc/ojdbc10/19.22.0.0/ojdbc10-19.22.0.0.jar" />
+  </library>
+</eclipse-userlibraries>
+
