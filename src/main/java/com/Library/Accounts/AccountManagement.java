@@ -1,3 +1,5 @@
+
+
 package com.Library.Accounts;
 
 
@@ -24,6 +26,9 @@ import static com.Library.Layout.printTable;
 
 
 public class AccountManagement{
+    public static String loggedInAdminUsername;
+    public static String loggedInLibrarianUsername;
+    public static String loggedInPatronUsername;
     private static Scanner sc = new Scanner(System.in);
     public void librarianLogin() throws SQLException, SqlConnectionException, InvalidDateFormatException, ValidPasswordExceptions, ValidemailExceptions {
         int loginAttempts = 0;
@@ -44,7 +49,8 @@ public class AccountManagement{
                 statement.setString(2, password);
                 ResultSet resultSet = statement.executeQuery();
                 if (resultSet.next()) {
-                    System.out.println("Login successful");
+                    System.out.println("Welcome, " + username );
+                    loggedInLibrarianUsername = username;
                     LibrarianMenu librarianMenu = new LibrarianMenu();
                     librarianMenu.Librarian();
                     return; // Exit the method after successful login
@@ -85,6 +91,9 @@ public class AccountManagement{
                 ResultSet resultSet = statement.executeQuery();
                 if (resultSet.next()) {
                     System.out.println("Login successful");
+                    loggedInAdminUsername = username;
+                    // Store the logged-in admin's username
+                    // ... proceed with admin menu ...
                     AdminMenu adminMenu = new AdminMenu();
                     adminMenu.Admin();
                     return; // Exit the method after successful login
@@ -102,8 +111,7 @@ public class AccountManagement{
 
         // If login attempts exceed the maximum allowed, return to main menu
         System.out.println("Maximum login attempts exceeded. Returning to the main menu.");
-        Driver driver = new Driver();
-        driver.mainmenu();
+        // ... return to main menu ...
     }
 
     public void patronLogin() throws SQLException, SqlConnectionException, InvalidDateFormatException, ValidPasswordExceptions, ValidemailExceptions {
@@ -125,7 +133,8 @@ public class AccountManagement{
                 statement.setString(2, password);
                 ResultSet resultSet = statement.executeQuery();
                 if (resultSet.next()) {
-                    System.out.println("Login successful");
+                    System.out.println("Welcome, " + username + "!");
+                    loggedInPatronUsername = username;
                     PatronMenu patronMenu = new PatronMenu();
                     patronMenu.patron();
                     return; // Exit the method after successful login
@@ -157,11 +166,11 @@ public class AccountManagement{
         String email, username, password, phone;
         do {
             System.out.println("Enter Admin Email:");
-             email = sc.nextLine();
+            email = sc.nextLine();
         }while (!Validator.isValidEmail(email));
         do {
             System.out.println("Enter Admin Phone:");
-             phone = sc.nextLine();
+            phone = sc.nextLine();
         }while (!Validator.isValidPhone(phone));
         do {
             System.out.println("Enter Admin Username:");
@@ -169,7 +178,7 @@ public class AccountManagement{
         }while (!Validator.isValidUsername(username));
         do {
             System.out.println("Enter Admin Password:");
-             password = sc.nextLine();
+            password = sc.nextLine();
         }while (!Validator.isValidPassword(password));
         Admin newAdmin = new Admin(firstName, lastName, email, phone, new Account(username, password, "admin"));
         String sql = "INSERT INTO finallibrary.Admins (AdminID, FirstName, LastName, Email, Phone, AccountID) VALUES (finallibrary.admins_seq.NEXTVAL, ?, ?, ?, ?, ?)";
@@ -201,7 +210,7 @@ public class AccountManagement{
             }
         } catch (SQLException e) {
             System.out.println("Error adding admin to the database.");
-           if (isAdminAdded) {
+            if (isAdminAdded) {
                 try {
 
                     String deleteAccountSql = "DELETE FROM finallibrary.Accounts WHERE Username = ?";
@@ -260,8 +269,8 @@ public class AccountManagement{
             username = scanner.nextLine();
         }while (!Validator.isValidUsername(username));
         do{
-        System.out.println("Enter Patron Password:");
-        password = scanner.nextLine();
+            System.out.println("Enter Patron Password:");
+            password = scanner.nextLine();
         }while (!Validator.isValidPassword(password));
         int lastLibraryId = getLastLibraryId();
         LocalDate dateOfExpiry = dateOfJoin.plusYears(1);
@@ -331,17 +340,19 @@ public class AccountManagement{
         String phone;
         String username;
         String password;
-        boolean isLibrarianAdded = false; // Flag to track if librarian was successfully added
+        boolean isLibrarianAdded = false;
+        // Flag to track if librarian was successfully added
+        String status = "active";
 
 
-            System.out.println("Enter the first name of the librarian: ");
-            firstName = sc.nextLine();
+        System.out.println("Enter the first name of the librarian: ");
+        firstName = sc.nextLine();
         System.out.println("Enter Librarian Last Name:");
         lastName = sc.nextLine();
         do{
-        System.out.println("Enter Librarian Email:");
-         email = sc.nextLine();
-         }while (!Validator.isValidEmail(email));
+            System.out.println("Enter Librarian Email:");
+            email = sc.nextLine();
+        }while (!Validator.isValidEmail(email));
         do {
             System.out.println("Enter Librarian Phone:");
             phone = sc.nextLine();
@@ -359,7 +370,7 @@ public class AccountManagement{
 
         Librarian newLibrarian = new Librarian(firstName, lastName, email, phone, new Account(username, password, "librarian"),lastLibraryId);
         // SQL statement to insert a new librarian into the Librarians table
-        String sql = "INSERT INTO finallibrary.Librarian (LibrarianID, FirstName, LastName, Email, Phone, AccountID, LibraryID) VALUES (finallibrary.librarian_seq.NEXTVAL, ?, ?, ?, ?, ?,?)";
+        String sql = "INSERT INTO finallibrary.Librarian (LibrarianID, FirstName, LastName, Email, Phone, AccountID, LibraryID, Accountstatus) VALUES (finallibrary.librarian_seq.NEXTVAL, ?, ?, ?, ?, ?,?,?)";
         // Establish a connection to the database
         try (Connection conn = DataBaseutils.getConnection()) {
             String accountSql = "INSERT INTO finallibrary.Accounts (AccountID, Username, Password, AccountType) " +
@@ -378,6 +389,7 @@ public class AccountManagement{
             statement.setString(4, phone);
             statement.setInt(5, getLastAccountId(conn));
             statement.setInt(6, getLastLibraryId());
+            statement.setString(7, status);
 
             // Execute the librarian creation
 
@@ -411,54 +423,27 @@ public class AccountManagement{
         }
     }
 
-    public void viewAdmin() throws SQLException, SqlConnectionException {
-        String sql = "SELECT * FROM finallibrary.Admins";
 
-        List<String[]> rows = new ArrayList<>();
-        String[] headers = {"Admin ID", "First Name", "Last Name", "Email", "Phone", "Account ID"};
-
-        try (Connection conn = DataBaseutils.getConnection();
-             Statement statement = conn.createStatement();
-             ResultSet resultSet = statement.executeQuery(sql)) {
-
-            if (!resultSet.isBeforeFirst()) {
-                System.out.println("No admins found in the database.");
-                return;
-            }
-
-            while (resultSet.next()) {
-                String[] rowData = {
-                        resultSet.getString("AdminID"),
-                        resultSet.getString("FirstName"),
-                        resultSet.getString("LastName"),
-                        resultSet.getString("Email"),
-                        resultSet.getString("Phone"),
-                        resultSet.getString("AccountID")
-                };
-                rows.add(rowData);
-            }
-        } catch (SQLException e) {
-            System.out.println("Error retrieving admins from the database.");
-            e.printStackTrace();
+    public static void viewPatron() throws SqlConnectionException {
+        if (loggedInPatronUsername == null || loggedInPatronUsername.isEmpty()) {
+            System.out.println("No patron is currently logged in.");
             return;
         }
 
-        // Sort admins by Admin ID
-        Collections.sort(rows, Comparator.comparing(row -> Integer.parseInt(row[0])));
-
-        printTable(headers, rows);
-    }
-    public void viewPatron() throws SqlConnectionException {
         String sql = "SELECT * FROM finallibrary.Patron";
+
         List<String[]> rows = new ArrayList<>();
         String[] headers = {"Patron ID", "First Name", "Last Name", "Email", "Phone", "Address", "Date of Joining", "Expiry Date", "Status", "Username", "Password", "Account Type"};
+
         try (Connection conn = DataBaseutils.getConnection();
              Statement statement = conn.createStatement();
              ResultSet resultSet = statement.executeQuery(sql)) {
+
             if (!resultSet.isBeforeFirst()) {
                 System.out.println("No patrons found in the database.");
                 return;
             }
+
             while (resultSet.next()) {
                 String[] rowData = {
                         resultSet.getString("PatronID"),
@@ -475,18 +460,21 @@ public class AccountManagement{
                         resultSet.getString("AccountType")
                 };
                 rows.add(rowData);
-
-                rows.sort(Comparator.comparing(row -> Integer.parseInt(row[0])));
-
-                printTable(headers, rows);
             }
         } catch (SQLException e) {
             System.out.println("Error viewing patrons from the database.");
+            e.printStackTrace();
             return;
         }
+        printTable(headers, rows);
     }
 
     public static void viewLibrarians() throws SQLException, SqlConnectionException {
+        if (loggedInLibrarianUsername == null || loggedInLibrarianUsername.isEmpty()) {
+            System.out.println("No admin is currently logged in.");
+            return;
+        }
+
         String sql = "SELECT * FROM finallibrary.Librarian";
 
         List<String[]> rows = new ArrayList<>();
@@ -511,45 +499,14 @@ public class AccountManagement{
                 };
                 rows.add(rowData);
             }
+        } catch (SQLException e) {
+            System.out.println("Error viewing librarians from the database.");
+            e.printStackTrace();
+            return;
         }
-
-        // Sort librarians by ID
-        rows.sort(Comparator.comparing(row -> Integer.parseInt(row[0])));
-
         printTable(headers, rows);
     }
-        public void removeAdmin() throws SQLException, SqlConnectionException {
-        viewAdmin();
-        int attempts = 0;
-        final int MAX_ATTEMPTS = 3;
-        while (attempts < MAX_ATTEMPTS) {
-            System.out.println("Enter the ID of the admin you want to remove: ");
-            String adminID = sc.nextLine();
-            String sql = "DELETE FROM finallibrary.Admins WHERE AdminID = ?";
-            try (Connection conn = DataBaseutils.getConnection();
-                 PreparedStatement statement = conn.prepareStatement(sql)) {
-                statement.setString(1, adminID);
-                int rowsAffected = statement.executeUpdate();
-                if (rowsAffected > 0) {
-                    System.out.println("Admin removed successfully");
-                    return; // Exit the method after successful removal
-                } else {
-                    System.out.println("No admin with that ID exists in the database");
-                    attempts++;
-                    if (attempts >= MAX_ATTEMPTS) {
-                        System.out.println("Maximum attempts reached. Exiting removal process.");
-                        return;
-                    }
-                    System.out.println("You have " + (MAX_ATTEMPTS - attempts) + " attempts left.");
-                }
-            } catch (SQLException e) {
-                System.out.println("Error removing admin from the database.");
-                e.printStackTrace();
-                throw e;
-            }
-        }
-        System.out.println("Maximum attempts reached. Exiting removal process.");
-    }
+
     public void removeLibrarian() throws SQLException, SqlConnectionException {
         viewLibrarians();
         int attempts = 0;
@@ -557,31 +514,32 @@ public class AccountManagement{
         while (attempts < MAX_ATTEMPTS) {
             System.out.println("Enter the ID of the librarian you want to remove: ");
             String librarianID = sc.nextLine();
-            String sql = "DELETE FROM finallibrary.Librarian WHERE LibrarianID = ?";
+            String sql = "UPDATE finallibrary.Librarian SET Accountstatus = 'inactive' WHERE LibrarianID = ?";
             try (Connection conn = DataBaseutils.getConnection();
                  PreparedStatement statement = conn.prepareStatement(sql)) {
                 statement.setString(1, librarianID);
                 int rowsAffected = statement.executeUpdate();
                 if (rowsAffected > 0) {
-                    System.out.println("Librarian removed successfully");
-                    return; // Exit the method after successful removal
+                    System.out.println("Librarian status updated successfully");
+                    return; // Exit the method after successful status update
                 } else {
                     System.out.println("No librarian with that ID exists in the database");
                     attempts++;
                     if (attempts >= MAX_ATTEMPTS) {
-                        System.out.println("Maximum attempts reached. Exiting removal process.");
+                        System.out.println("Maximum attempts reached. Exiting status update process.");
                         return;
                     }
                     System.out.println("You have " + (MAX_ATTEMPTS - attempts) + " attempts left.");
                 }
             } catch (SQLException e) {
-                System.out.println("Error removing librarian from the database.");
+                System.out.println("Error updating librarian status in the database.");
                 e.printStackTrace();
                 throw e;
             }
         }
-        System.out.println("Maximum attempts reached. Exiting removal process.");
+        System.out.println("Maximum attempts reached. Exiting status update process.");
     }
+
 
     public void pauseMembership() throws SQLException, SqlConnectionException {
         viewPatron();
@@ -597,7 +555,7 @@ public class AccountManagement{
                 statement.setString(1, patronID);
                 ResultSet resultSet = statement.executeQuery();
                 if (resultSet.next()) {
-                    String pauseSql = "UPDATE finallibrary.Patron SET Status = 'Not a Member' WHERE PatronID = ?";
+                    String pauseSql = "UPDATE finallibrary.Patron SET Status = 'Inactive' WHERE PatronID = ?";
                     try (PreparedStatement pauseStatement = conn.prepareStatement(pauseSql)) {
                         pauseStatement.setString(1, patronID);
                         pauseStatement.executeUpdate();
@@ -631,7 +589,7 @@ public class AccountManagement{
                 statement.setString(1, patronID);
                 ResultSet resultSet = statement.executeQuery();
                 if (resultSet.next()) {
-                    String pauseSql = "UPDATE finallibrary.Patron SET Status = 'Member' WHERE PatronID = ?";
+                    String pauseSql = "UPDATE finallibrary.Patron SET Status = 'Active' WHERE PatronID = ?";
                     try (PreparedStatement pauseStatement = conn.prepareStatement(pauseSql)) {
                         pauseStatement.setString(1, patronID);
                         pauseStatement.executeUpdate();
@@ -651,210 +609,226 @@ public class AccountManagement{
 
     }
 
+    public void updateLibrarianProfile() throws SQLException, SqlConnectionException {
+        viewLibrarians(); // Display current librarian details
+        Scanner sc = new Scanner(System.in);
+        int attempts = 0;
+        final int MAX_ATTEMPTS = 3;
+        while (attempts < MAX_ATTEMPTS) {
+            System.out.println("Select the field you want to update:");
+            System.out.println("1. First Name");
+            System.out.println("2. Last Name");
+            System.out.println("3. Phone");
+            System.out.println("4. Email");
+            System.out.println("5. Exit update process");
+
+            int choice;
+            try {
+                choice = sc.nextInt();
+                sc.nextLine(); // Consume newline
+            } catch (InputMismatchException e) {
+                System.out.println("Invalid input. Please enter a number.");
+                sc.nextLine(); // Consume invalid input
+                continue;
+            }
+
+            String fieldToUpdate;
+            switch (choice) {
+                case 1:
+                    fieldToUpdate = "FirstName";
+                    break;
+                case 2:
+                    fieldToUpdate = "LastName";
+                    break;
+                case 3:
+                    fieldToUpdate = "Phone";
+                    break;
+                case 4:
+                    fieldToUpdate = "Email";
+                    break;
+                case 5:
+                    System.out.println("Exiting update process.");
+                    return;
+                default:
+                    System.out.println("Invalid choice. Please enter a number between 1 and 5.");
+                    continue;
+            }
+
+            System.out.println("Enter new value for " + fieldToUpdate + " (leave blank to keep current value):");
+            String newValue = sc.nextLine();
+
+            // Fetch the LibrarianID based on the logged-in username
+            int librarianId = getLibrarianIdFromUsername(loggedInAdminUsername);
+
+            String updateLibrarianSql = "UPDATE finallibrary.Librarian SET " + fieldToUpdate + " = ? WHERE LibrarianID = ?";
+            try (Connection conn = DataBaseutils.getConnection();
+                 PreparedStatement statement = conn.prepareStatement(updateLibrarianSql)) {
+                statement.setString(1, newValue.isEmpty() ? getCurrentFieldValue(librarianId, fieldToUpdate, "Librarian", conn) : newValue);
+                statement.setInt(2, librarianId);
+                int rowsAffected = statement.executeUpdate();
+
+                if (rowsAffected > 0) {
+                    System.out.println("Librarian details updated successfully.");
+                } else {
+                    System.out.println("No changes were made to the librarian details.");
+                }
+                return; // Exit the method after successful update
+            } catch (SQLException e) {
+                System.out.println("Error updating librarian details.");
+                e.printStackTrace();
+            }
+            attempts++; // Increment attempts
+        }
+        System.out.println("Maximum attempts reached. Exiting update process.");
+    }
+
+
+
+
+    public void updateMemberProfile() throws SQLException, SqlConnectionException {
+        viewPatron(); // Display current patron details
+        Scanner sc = new Scanner(System.in);
+        int attempts = 0;
+        final int MAX_ATTEMPTS = 3;
+        while (attempts < MAX_ATTEMPTS) {
+            System.out.println("Select the field you want to update:");
+            System.out.println("1. First Name");
+            System.out.println("2. Last Name");
+            System.out.println("3. Phone");
+            System.out.println("4. Email");
+            System.out.println("5. Address");
+            System.out.println("6. Exit update process");
+
+            int choice;
+            try {
+                choice = sc.nextInt();
+                sc.nextLine(); // Consume newline
+            } catch (InputMismatchException e) {
+                System.out.println("Invalid input. Please enter a number.");
+                sc.nextLine(); // Consume invalid input
+                continue;
+            }
+
+            String fieldToUpdate;
+            switch (choice) {
+                case 1:
+                    fieldToUpdate = "FirstName";
+                    break;
+                case 2:
+                    fieldToUpdate = "LastName";
+                    break;
+                case 3:
+                    fieldToUpdate = "Phone";
+                    break;
+                case 4:
+                    fieldToUpdate = "Email";
+                    break;
+                case 5:
+                    fieldToUpdate = "Address";
+                    break;
+                case 6:
+                    System.out.println("Exiting update process.");
+                    return;
+                default:
+                    System.out.println("Invalid choice. Please enter a number between 1 and 6.");
+                    continue;
+            }
+
+            System.out.println("Enter new value for " + fieldToUpdate + " (leave blank to keep current value):");
+            String newValue = sc.nextLine();
+
+            // Fetch the PatronID based on the logged-in username
+            int patronId = getPatronIdFromUsername(loggedInAdminUsername);
+
+            String updatePatronSql = "UPDATE finallibrary.Patron SET " + fieldToUpdate + " = ? WHERE PatronID = ?";
+            try (Connection conn = DataBaseutils.getConnection();
+                 PreparedStatement statement = conn.prepareStatement(updatePatronSql)) {
+                statement.setString(1, newValue.isEmpty() ? getCurrentFieldValue(patronId, fieldToUpdate, "Patron", conn) : newValue);
+                statement.setInt(2, patronId);
+                int rowsAffected = statement.executeUpdate();
+
+                if (rowsAffected > 0) {
+                    System.out.println("Patron details updated successfully.");
+                } else {
+                    System.out.println("No changes were made to the patron details.");
+                }
+                return; // Exit the method after successful update
+            } catch (SQLException e) {
+                System.out.println("Error updating patron details.");
+                e.printStackTrace();
+            }
+            attempts++; // Increment attempts
+        }
+        System.out.println("Maximum attempts reached. Exiting update process.");
+    }
 
     public void updateAdminProfile() throws SQLException, SqlConnectionException {
-
+        viewAdmin(); // Display current admin details
         Scanner sc = new Scanner(System.in);
         int attempts = 0;
         final int MAX_ATTEMPTS = 3;
         while (attempts < MAX_ATTEMPTS) {
-            System.out.println("Enter the ID of the admin you want to update: ");
-            String adminID = sc.nextLine();
-            String sql = "SELECT * FROM finallibrary.Admins WHERE AdminID = ?";
+            System.out.println("Select the field you want to update:");
+            System.out.println("1. First Name");
+            System.out.println("2. Last Name");
+            System.out.println("3. Phone");
+            System.out.println("4. Email");
+            System.out.println("5. Exit update process");
+
+            int choice;
+            try {
+                choice = sc.nextInt();
+                sc.nextLine(); // Consume newline
+            } catch (InputMismatchException e) {
+                System.out.println("Invalid input. Please enter a number.");
+                sc.nextLine(); // Consume invalid input
+                continue;
+            }
+
+            String fieldToUpdate;
+            switch (choice) {
+                case 1:
+                    fieldToUpdate = "FirstName";
+                    break;
+                case 2:
+                    fieldToUpdate = "LastName";
+                    break;
+                case 3:
+                    fieldToUpdate = "Phone";
+                    break;
+                case 4:
+                    fieldToUpdate = "Email";
+                    break;
+                case 5:
+                    System.out.println("Exiting update process.");
+                    return;
+                default:
+                    System.out.println("Invalid choice. Please enter a number between 1 and 5.");
+                    continue;
+            }
+
+            System.out.println("Enter new value for " + fieldToUpdate + " (leave blank to keep current value):");
+            String newValue = sc.nextLine();
+
+            // Fetch the AdminID based on the logged-in username
+            int adminId = getAdminIdFromUsername(loggedInAdminUsername);
+
+            String updateAdminSql = "UPDATE finallibrary.Admins SET " + fieldToUpdate + " = ? WHERE AdminID = ?";
             try (Connection conn = DataBaseutils.getConnection();
-                 PreparedStatement statement = conn.prepareStatement(sql)) {
-                statement.setString(1, adminID);
-                ResultSet resultSet = statement.executeQuery();
-                if (resultSet.next()) {
-                    System.out.println("Enter new first name (leave blank to keep current value): ");
-                    String newFirstName = sc.nextLine();
-                    System.out.println("Enter new last name (leave blank to keep current value): ");
-                    String newLastName = sc.nextLine();
-                    String newPhone, newEmail;
-                    do {
-                        System.out.println("Enter new phone (leave blank to keep current value): ");
-                        newPhone = sc.nextLine();
-                    } while (!Validator.isValidPhone(newPhone));
-                    do {
-                        System.out.println("Enter new email (leave blank to keep current value): ");
-                        newEmail = sc.nextLine();
-                    } while (!Validator.isValidEmail(newEmail));
-                    // Update Admin Details
-                    String updateAdminSql = "UPDATE finallibrary.Admins SET FirstName = ?, LastName = ?, Phone = ?, Email = ? WHERE AdminID = ?";
-                    try (PreparedStatement updateAdminStatement = conn.prepareStatement(updateAdminSql)) {
-                        updateAdminStatement.setString(1, newFirstName.isEmpty() ? resultSet.getString("FirstName") : newFirstName);
-                        updateAdminStatement.setString(2, newLastName.isEmpty() ? resultSet.getString("LastName") : newLastName);
-                        updateAdminStatement.setString(3, newPhone.isEmpty() ? resultSet.getString("Phone") : newPhone);
-                        updateAdminStatement.setString(4, newEmail.isEmpty() ? resultSet.getString("Email") : newEmail);
-                        updateAdminStatement.setString(5, adminID);
-                        updateAdminStatement.executeUpdate();
-                    }
+                 PreparedStatement statement = conn.prepareStatement(updateAdminSql)) {
+                statement.setString(1, newValue.isEmpty() ? getCurrentFieldValue(Integer.parseInt(String.valueOf(adminId)), fieldToUpdate, conn) : newValue);
+                statement.setInt(2, adminId);
+                int rowsAffected = statement.executeUpdate();
+
+                if (rowsAffected > 0) {
                     System.out.println("Admin details updated successfully.");
-                    return; // Exit the method after successful update
                 } else {
-                    System.out.println("Admin with ID " + adminID + " not found.");
+                    System.out.println("No changes were made to the admin details.");
                 }
-            }
-            attempts++; // Increment attempts
-        }
-        System.out.println("Maximum attempts reached. Exiting update process.");
-    }
-
-    public void updateMemberProfile() throws SQLException, SqlConnectionException,ValidemailExceptions,ValidPasswordExceptions {
-
-        Scanner sc = new Scanner(System.in);
-        int attempts = 0;
-        final int MAX_ATTEMPTS = 3;
-        while (attempts < MAX_ATTEMPTS) {
-            System.out.println("Enter the ID of the patron you want to update: ");
-            String patronID = sc.nextLine();
-            String sql = "SELECT * FROM finallibrary.Patron WHERE PatronID = ?";
-            try (Connection conn = DataBaseutils.getConnection();
-                 PreparedStatement statement = conn.prepareStatement(sql)) {
-                statement.setString(1, patronID);
-                ResultSet resultSet = statement.executeQuery();
-                if (resultSet.next()) {
-                    System.out.println("Enter new first name (leave blank to keep current value): ");
-                    String newFirstName = sc.nextLine();
-                    System.out.println("Enter new last name (leave blank to keep current value): ");
-                    String newLastName = sc.nextLine();
-                    String newPhone, newEmail,newUsername,newPassword;
-                    do {
-                        System.out.println("Enter new phone (leave blank to keep current value): ");
-                        newPhone = sc.nextLine();
-                    } while (!Validator.isValidPhone(newPhone));
-                    do {
-                        System.out.println("Enter new email (leave blank to keep current value): ");
-                        newEmail = sc.nextLine();
-                    }while(!Validator.isValidEmail(newEmail));
-                    System.out.println("Enter new address (leave blank to keep current value): ");
-                    String newAddress = sc.nextLine();
-                    // Update Patron Details
-                    String updatePatronSql = "UPDATE finallibrary.Patron SET FirstName = ?, LastName = ?, Phone = ?, Email = ?, Address = ? WHERE PatronID = ?";
-                    try (PreparedStatement updatePatronStatement = conn.prepareStatement(updatePatronSql)) {
-                        updatePatronStatement.setString(1, newFirstName.isEmpty() ? resultSet.getString("FirstName") : newFirstName);
-                        updatePatronStatement.setString(2, newLastName.isEmpty() ? resultSet.getString("LastName") : newLastName);
-                        updatePatronStatement.setString(3, newPhone.isEmpty() ? resultSet.getString("Phone") : newPhone);
-                        updatePatronStatement.setString(4, newEmail.isEmpty() ? resultSet.getString("Email") : newEmail);
-                        updatePatronStatement.setString(5, newAddress.isEmpty() ? resultSet.getString("Address") : newAddress);
-                        updatePatronStatement.setString(6, patronID);
-                        updatePatronStatement.executeUpdate();
-                    }
-                    // Update UserName and Password in Accounts Tab
-
-                    do {
-                        System.out.println("Enter new UserName (leave blank to keep current value): ");
-                        newUsername = sc.nextLine();
-                    }while(!Validator.isValidUsername(newUsername));
-                    do{
-                        System.out.println("Enter new Password (leave blank to keep current value): ");
-                        newPassword = sc.nextLine();
-                    }while(!Validator.isValidPassword(newPassword));
-                    String updateAccountSql = "UPDATE finallibrary.Accounts SET UserName = ?, Password = ? WHERE AccountID = ?";
-                    try (PreparedStatement updateAccountStatement = conn.prepareStatement(updateAccountSql)) {
-                        // Retrieve AccountID from the current patron's record
-                        String accountID = resultSet.getString("AccountID");
-                        updateAccountStatement.setString(1, newUsername.isEmpty() ? resultSet.getString("UserName") : newUsername);
-                        updateAccountStatement.setString(2, newPassword.isEmpty() ? resultSet.getString("Password") : newPassword);
-                        updateAccountStatement.setString(3, accountID);
-                        updateAccountStatement.executeUpdate();
-                    }
-
-
-                    System.out.println("Patron details updated successfully.");
-                    return; // Exit the method after successful update
-                }
-                else {
-                    System.out.println("Patron with ID " + patronID + " not found.");
-                }
-
-            }
-
-            attempts++; // Increment attempts
-        }
-        System.out.println("Maximum attempts reached. Exiting update process.");
-    }
-
-    public void UpdateLibrarianProfile() throws SQLException, SqlConnectionException {
-
-
-        Scanner sc = new Scanner(System.in);
-        int attempts = 0;
-        final int MAX_ATTEMPTS = 3;
-        while (attempts < MAX_ATTEMPTS) {
-            System.out.println("Enter the ID of the librarian you want to update: ");
-            String librarianID = sc.nextLine();
-            String sql = "SELECT * FROM finallibrary.Librarian WHERE LibrarianID = ?";
-            try (Connection conn = DataBaseutils.getConnection();
-                 PreparedStatement statement = conn.prepareStatement(sql)) {
-                statement.setString(1, librarianID);
-                ResultSet resultSet = statement.executeQuery();
-                if (resultSet.next()) {
-
-                    System.out.println("Enter new first name  ");
-                    String newFirstName = sc.nextLine();
-                    System.out.println("Enter new last name  ");
-                    String newLastName = sc.nextLine();
-                    String newPhone, newEmail, newUserName, newPassword;
-
-                    // Loop for getting a valid phone number
-                    do {
-                        System.out.println("Enter new phone  ");
-                        newPhone = sc.nextLine();
-                        if (newPhone.isEmpty()) {
-                            // If input is empty, break the loop
-                            break;
-                        }
-                    } while (!Validator.isValidPhone(newPhone));
-
-                    // Loop for getting a valid email
-                    do {
-                        System.out.println("Enter new email  ");
-                        newEmail = sc.nextLine();
-                        if (newEmail.isEmpty()) {
-                            // If input is empty, break the loop
-                            break;
-                        }
-                    } while (!Validator.isValidEmail(newEmail));
-
-                    do {
-
-
-                        System.out.println("Enter new UserName  ");
-                        newUserName = sc.nextLine();
-                    }while(!Validator.isValidUsername(newUserName));
-
-                    do {
-                        System.out.println("Enter new Password  ");
-                        newPassword = sc.nextLine();
-                    }while(!Validator.isValidPassword(newPassword));
-
-                    // Update Librarian Details
-                    String updateLibrarianSql = "UPDATE finallibrary.Librarian SET FirstName = ?, LastName = ?, Phone = ?, Email = ? WHERE LibrarianID = ?";
-                    try (PreparedStatement updateLibrarianStatement = conn.prepareStatement(updateLibrarianSql))  {
-                        updateLibrarianStatement.setString(1, newFirstName.isEmpty() ? resultSet.getString("FirstName") : newFirstName);
-                        updateLibrarianStatement.setString(2, newLastName.isEmpty() ? resultSet.getString("LastName") : newLastName);
-                        updateLibrarianStatement.setString(3, newPhone.isEmpty() ? resultSet.getString("Phone") : newPhone);
-                        updateLibrarianStatement.setString(4, newEmail.isEmpty() ? resultSet.getString("Email") : newEmail);
-                        updateLibrarianStatement.setString(5, librarianID);
-                        updateLibrarianStatement.executeUpdate();
-                    }
-
-                    // Update Account Details
-                    String updateAccountSql = "UPDATE finallibrary.Accounts SET UserName = ?, Password = ? WHERE AccountID = ?";
-                    PreparedStatement updateAccountStatement = conn.prepareStatement(updateAccountSql);
-                    // Retrieve AccountID from the current librarian's record
-                    String accountID = resultSet.getString("AccountID");
-                    updateAccountStatement.setString(1, newUserName.isEmpty() ? resultSet.getString("UserName") : newUserName);
-                    updateAccountStatement.setString(2, newPassword.isEmpty() ? resultSet.getString("Password") : newPassword);
-                    updateAccountStatement.setString(3, accountID);
-                    updateAccountStatement.executeUpdate();
-
-                    System.out.println("Librarian details updated successfully.");
-                    return; // Exit the method after successful update
-                }
+                return; // Exit the method after successful update
             } catch (SQLException e) {
-                System.out.println("Error updating librarian details in the database.");
+                System.out.println("Error updating admin details.");
+                e.printStackTrace();
             }
             attempts++; // Increment attempts
         }
@@ -887,7 +861,139 @@ public class AccountManagement{
         }
     }
 
+
+
+    public static void viewAdmin() throws SQLException, SqlConnectionException {
+        if (loggedInAdminUsername == null || loggedInAdminUsername.isEmpty()) {
+            System.out.println("No admin is currently logged in.");
+            return;
+        }
+
+        String sql = "SELECT * FROM finallibrary.Admins " +
+                "JOIN finallibrary.Accounts ON Admins.AccountID = Accounts.AccountID " +
+                "WHERE Username = ?";
+
+        List<String[]> rows = new ArrayList<>();
+        String[] headers = {"Admin ID", "First Name", "Last Name", "Email", "Phone", "Account ID"};
+
+        try (Connection conn = DataBaseutils.getConnection();
+             PreparedStatement statement = conn.prepareStatement(sql)) {
+
+            statement.setString(1, loggedInAdminUsername);
+
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.isBeforeFirst()) {
+                    System.out.println("No admin found with the current username.");
+                    return;
+                }
+
+                while (resultSet.next()) {
+                    String[] rowData = {
+                            resultSet.getString("AdminID"),
+                            resultSet.getString("FirstName"),
+                            resultSet.getString("LastName"),
+                            resultSet.getString("Email"),
+                            resultSet.getString("Phone"),
+                            resultSet.getString("AccountID")
+                    };
+                    rows.add(rowData);
+                }
+            }
+        } catch (SQLException e) {
+            System.out.println("Error retrieving admin details from the database.");
+            e.printStackTrace();
+            throw e;
+        }
+        printTable(headers, rows);
+
+    }
+
+
+    // Helper method to get the AdminID based on the username
+    private int getAdminIdFromUsername(String username) throws SQLException, SqlConnectionException {
+        String adminIdQuery = "SELECT AdminID FROM finallibrary.Admins " +
+                "JOIN finallibrary.Accounts ON Admins.AccountID = Accounts.AccountID " +
+                "WHERE Username = ?";
+        try (Connection conn = DataBaseutils.getConnection();
+             PreparedStatement adminIdStatement = conn.prepareStatement(adminIdQuery)) {
+            adminIdStatement.setString(1, username);
+            try (ResultSet adminIdResultSet = adminIdStatement.executeQuery()) {
+                if (adminIdResultSet.next()) {
+                    return adminIdResultSet.getInt("AdminID");
+                } else {
+                    throw new SQLException("Admin not found with username: " + username);
+                }
+            }
+        }
+    }
+
+    private int getLibrarianIdFromUsername(String username) throws SQLException, SqlConnectionException {
+        String librarianIdQuery = "SELECT LibrarianID FROM finallibrary.Librarian " +
+                "JOIN finallibrary.Accounts ON Librarian.AccountID = Accounts.AccountID " +
+                "WHERE Username = ?";
+        try (Connection conn = DataBaseutils.getConnection();
+             PreparedStatement librarianIdStatement = conn.prepareStatement(librarianIdQuery)) {
+            librarianIdStatement.setString(1, username);
+            try (ResultSet librarianIdResultSet = librarianIdStatement.executeQuery()) {
+                if (librarianIdResultSet.next()) {
+                    return librarianIdResultSet.getInt("LibrarianID");
+                } else {
+                    throw new SQLException("Librarian not found with username: " + username);
+                }
+            }
+        }
+    }
+
+    public static int getPatronIdFromUsername(String username) throws SQLException, SqlConnectionException {
+        String patronIdQuery = "SELECT PatronID FROM finallibrary.Patron " +
+                "JOIN finallibrary.Accounts ON Patron.AccountID = Accounts.AccountID " +
+                "WHERE Username = ?";
+        try (Connection conn = DataBaseutils.getConnection();
+             PreparedStatement patronIdStatement = conn.prepareStatement(patronIdQuery)) {
+            patronIdStatement.setString(1, username);
+            try (ResultSet patronIdResultSet = patronIdStatement.executeQuery()) {
+                if (patronIdResultSet.next()) {
+                    return patronIdResultSet.getInt("PatronID");
+                } else {
+                    throw new SQLException("Patron not found with username: " + username);
+                }
+            }
+        }
+    }
+    private String getCurrentFieldValue(int adminID, String field, Connection conn) throws SQLException {
+        String sql = "SELECT " + field + " FROM finallibrary.Admins WHERE AdminID = ?";
+        try (PreparedStatement statement = conn.prepareStatement(sql)) {
+            statement.setInt(1, adminID);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    return resultSet.getString(field);
+                } else {
+                    throw new SQLException("Admin not found with ID: " + adminID);
+                }
+            }
+        }
+    }
+    private String getCurrentFieldValue(int userID, String field, String table, Connection conn) throws SQLException {
+        String sql = "SELECT " + field + " FROM finallibrary." + table + " WHERE " + table + "ID = ?";
+        try (PreparedStatement statement = conn.prepareStatement(sql)) {
+            statement.setInt(1, userID);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    return resultSet.getString(field);
+                } else {
+                    throw new SQLException(table + " not found with ID: " + userID);
+                }
+            }
+        }
+    }
+
+
+
+
+
     public static void main(String[] args) throws SQLException, SqlConnectionException, InvalidDateFormatException, ValidPasswordExceptions, ValidemailExceptions {
-        registerAdmin();
+        //registerAdmin();
+
+        viewAdmin();
     }
 }

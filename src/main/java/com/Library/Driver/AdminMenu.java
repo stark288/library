@@ -78,7 +78,7 @@ public class AdminMenu {
                 LibrarianActions();
                 break;
             case 3:
-                accountManagement.UpdateLibrarianProfile();
+                accountManagement.updateLibrarianProfile();
                 LibrarianActions();
                 break;
             case 4:

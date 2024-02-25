@@ -1,9 +1,10 @@
 package com.Library.Books;
 
 import java.sql.Date;
-import com.Library.Books.Author;
 
 public class Book {
+    private final String type;
+    private int copies;
     private int bookID;
     private String title;
     private String isbn;
@@ -19,8 +20,7 @@ public class Book {
     // Default constructor
 
 
-
-    public Book( String title, String isbn, Date publishedDate, String languages, String availability, String genre, String rackNo, Author Author, String Publishername, String PublisherDetails) {
+    public Book(String title, String isbn, Date publishedDate, String languages, String availability, String genre, String rackNo, com.Library.Books.Author author, String publisherName, String publisherDetails, String type, int copies) {
 
         this.title = title;
         this.isbn = isbn;
@@ -29,9 +29,10 @@ public class Book {
         this.availability = availability;
         this.genre = genre;
         this.rackNo = rackNo;
-        this.Publishername = Publishername;
-        this.PublisherDetails = PublisherDetails;
-
+        Publishername = publisherName;
+        PublisherDetails = publisherDetails;
+        this.type = type;
+        this.copies = copies;
 
     }
 
@@ -105,6 +106,12 @@ public class Book {
 
     public String getPublisherName() {
             return Publishername;
+    }
+    public String getType() {
+        return type;
+    }
+    public int getCopies() {
+        return copies;
     }
 
 

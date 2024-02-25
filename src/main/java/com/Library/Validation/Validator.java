@@ -53,4 +53,12 @@ public class Validator {
         return false;
     }
 
+    public static boolean isvalidfirstname(String firstname) {
+        //pattern for first name
+        String regex = "^[a-zA-Z]{3,20}$";
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(firstname);
+        return matcher.matches();
+    }
+
 }

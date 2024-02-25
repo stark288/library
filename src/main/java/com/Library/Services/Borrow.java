@@ -6,11 +6,14 @@ import com.Library.exceptions.SqlConnectionException;
 
 import java.sql.*;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Scanner;
 
+import static com.Library.Accounts.AccountManagement.getPatronIdFromUsername;
+import static com.Library.Accounts.AccountManagement.loggedInPatronUsername;
 import static com.Library.Layout.printTable;
 
 public class Borrow {
@@ -90,51 +93,73 @@ public class Borrow {
         }
 
     }
-
     public void borrowBook() throws SQLException, SqlConnectionException {
-        admin.viewBooks();
+        Admin.viewBooks();
 
         Scanner scanner = new Scanner(System.in);
-        System.out.println("Enter Book ID to borrow:");
-        int bookIdToBorrow = scanner.nextInt();
+        System.out.println("Enter the ISBN of the book to borrow:");
+        String isbnToBorrow = scanner.nextLine();
+
+        // Retrieve the BookID using the ISBN
+        int bookIdToBorrow = getBookIdFromISBN(isbnToBorrow);
+        if (bookIdToBorrow == -1) {
+            System.out.println("No book found with the given ISBN.");
+            return;
+        }
 
         if (!isBookAvailable(bookIdToBorrow)) {
             System.out.println("Book is not available for borrowing.");
             return;
         }
 
-        System.out.println("Enter Patron's unique identifier (e.g., username or email):");
-        String patronIdentifier = scanner.next();
-
-        int patronId = getPatronIdByIdentifier(patronIdentifier);
+        // Retrieve the PatronID using the logged-in patron's username
+        int patronId = getPatronIdFromUsername(loggedInPatronUsername);
         if (patronId == -1) {
-            System.out.println("No patron found with the given identifier.");
-            return;
-        }
-
-        if (isPatronReservedBook(patronId, bookIdToBorrow) && !hasPatronReturnedBook(patronId, bookIdToBorrow)) {
-            System.out.println("Patron has reserved this book but has not returned it. Cannot borrow.");
+            System.out.println("No patron found with the username: " + loggedInPatronUsername);
             return;
         }
 
         LocalDate borrowDate = LocalDate.now();
-        LocalDate dueDate = borrowDate.plusDays(14); // Assuming a 2-week borrowing period
+        LocalDate dueDate = borrowDate.plusWeeks(2); // Assuming a 2-week borrowing period
         String status = "borrowed";
 
-        String sql = "INSERT INTO finallibrary.Borrow (BORROWID, BOOKID, PATRONID, BORROWDATE, STATUS, DUEDATE) " +
-                "VALUES (finallibrary.borrow_seq.NEXTVAL, ?, ?, ?, ?, ?)";
-        try (Connection conn = DataBaseutils.getConnection();
-             PreparedStatement statement = conn.prepareStatement(sql)) {
-            statement.setInt(1, bookIdToBorrow);
-            statement.setInt(2, patronId);
-            statement.setDate(3, Date.valueOf(borrowDate));
-            statement.setString(4, status);
-            statement.setDate(5, Date.valueOf(dueDate));
-            int rowsInserted = statement.executeUpdate();
-            if (rowsInserted > 0) {
-                System.out.println("Book borrowed successfully!");
-            } else {
-                System.out.println("Failed to borrow book.");
+        // Start a transaction
+        try (Connection conn = DataBaseutils.getConnection()) {
+            conn.setAutoCommit(false); // Disable auto-commit for transaction
+
+            // Update the number of copies and availability in the Book table
+            String updateBookSql = "UPDATE finallibrary.Book SET Copies = Copies - 1, Availability = CASE WHEN (Copies - 1) <= 0 THEN 'not available' ELSE 'available' END WHERE ISBN = ? AND Copies > 0";
+            try (PreparedStatement updateBookStmt = conn.prepareStatement(updateBookSql)) {
+                updateBookStmt.setString(1, isbnToBorrow);
+                int booksUpdated = updateBookStmt.executeUpdate();
+                if (booksUpdated == 0) {
+                    System.out.println("No copies available to borrow.");
+                    conn.rollback(); // Rollback the transaction
+                    return;
+                }
+            }
+
+            // Insert the borrow record
+            String insertBorrowSql = "INSERT INTO finallibrary.Borrow (BORROWID, BOOKID, PATRONID, BORROWDATE, STATUS, DUEDATE) VALUES (finallibrary.borrow_seq.NEXTVAL, ?, ?, ?, ?, ?)";
+            try (PreparedStatement insertBorrowStmt = conn.prepareStatement(insertBorrowSql)) {
+                insertBorrowStmt.setInt(1, bookIdToBorrow);
+                insertBorrowStmt.setInt(2, patronId);
+                insertBorrowStmt.setDate(3, Date.valueOf(borrowDate));
+                insertBorrowStmt.setString(4, status);
+                insertBorrowStmt.setDate(5, Date.valueOf(dueDate));
+                int rowsInserted = insertBorrowStmt.executeUpdate();
+                if (rowsInserted > 0) {
+                    System.out.println("Book with ISBN " + isbnToBorrow + " borrowed successfully by " + loggedInPatronUsername);
+                    conn.commit(); // Commit the transaction
+                } else {
+                    System.out.println("Failed to borrow book.");
+                    conn.rollback(); // Rollback the transaction
+                }
+            } catch (SQLException e) {
+                conn.rollback(); // Rollback the transaction on error
+                throw e;
+            } finally {
+                conn.setAutoCommit(true); // Restore auto-commit mode
             }
         } catch (SQLException | SqlConnectionException e) {
             System.out.println("Error borrowing book from the database.");
@@ -142,6 +167,28 @@ public class Borrow {
             throw e;
         }
     }
+
+    private int getBookIdFromISBN(String isbn) throws SQLException, SqlConnectionException {
+        String sql = "SELECT BookID FROM finallibrary.Book WHERE ISBN = ?";
+        try (Connection conn = DataBaseutils.getConnection();
+             PreparedStatement statement = conn.prepareStatement(sql)) {
+            statement.setString(1, isbn);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    return resultSet.getInt("BookID");
+                } else {
+                    System.out.println("No book found with ISBN: " + isbn);
+                    return -1;
+                }
+            }
+        } catch (SQLException | SqlConnectionException e) {
+            System.out.println("Error retrieving BookID from the database.");
+            e.printStackTrace();
+        }
+        return -1;
+    }
+
+
     public void viewBorrows() throws SqlConnectionException, SQLException {
         String sql = "SELECT * FROM finallibrary.Borrow";
 

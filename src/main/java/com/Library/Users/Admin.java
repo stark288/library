@@ -55,7 +55,6 @@ public class Admin extends Person {
     // Establish a connection to the database
     public static void addBook() throws SQLException, SqlConnectionException, InvalidDateFormatException {
         Date publishedDate = null;
-        String availability = "available";
         Scanner sc = new Scanner(System.in);
         System.out.println("Enter the title of the book: ");
         String title = sc.nextLine();
@@ -69,7 +68,7 @@ public class Admin extends Person {
                 System.out.println("Enter the published date of the book (in dd/MM/yyyy format): ");
                 String inputDateStr = sc.nextLine();
                 LocalDate parsedDate = LocalDate.parse(inputDateStr, formatter);
-                publishedDate = java.sql.Date.valueOf(parsedDate);
+                publishedDate = Date.valueOf(parsedDate);
                 validDate = true;
             } catch (DateTimeParseException e) {
                 System.out.println("Error: Invalid date format. Please enter the date in dd/MM/yyyy format.");
@@ -91,9 +90,14 @@ public class Admin extends Person {
         String authorName = sc.nextLine();
         System.out.println("Enter the author details of the book: ");
         String authorDetails = sc.nextLine();
-        Book newBook = new Book(title, isbn, publishedDate, languages, availability, genre, rackNo, new Author(authorName, authorDetails), publisherName, publisherDetails);
+        System.out.println("Enter the type of book: ");
+        String type = sc.nextLine();
+        System.out.println("Enter the number of copies: ");
+        int copies = sc.nextInt();
+        String availability = copies > 0 ? "available" : "not available";
+        Book newBook = new Book(title, isbn, publishedDate, languages, availability, genre, rackNo, new Author(authorName, authorDetails), publisherName, publisherDetails, type, copies);
         // SQL statement to insert a new book into the Book table
-        String sql = "INSERT INTO finallibrary.Book (BookID, Title, ISBN, PublishedDate, Languages, Availability, Genre, RackNo, publishername, publisherDetails, Authorname, AuthorDetails,LIBRARYID) VALUES (finallibrary.book_seq.NEXTVAL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)";
+        String sql = "INSERT INTO finallibrary.Book (BookID, Title, ISBN, PublishedDate, Languages, Availability, Genre, RackNo, publishername, publisherDetails, Authorname, AuthorDetails,LIBRARYID,Typeofbook,copies) VALUES (finallibrary.book_seq.NEXTVAL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?,?,?)";
         // Establish a connection to the database
         try (Connection conn = DataBaseutils.getConnection();
              PreparedStatement statement = conn.prepareStatement(sql)) {
@@ -110,9 +114,8 @@ public class Admin extends Person {
             statement.setString(10, Author.getAuthorName());
             statement.setString(11, Author.getContactDetails());
             statement.setInt(12,accountManagement.getLastLibraryId());
-
-
-
+            statement.setString(13, newBook.getType());
+            statement.setInt(14, newBook.getCopies());
             int rowsAffected = statement.executeUpdate();
             if (rowsAffected > 0) {
                 System.out.println("Book added successfully");
@@ -195,14 +198,14 @@ public class Admin extends Person {
             Scanner sc = new Scanner(System.in);
             System.out.println("Enter the ISBN of the book you want to remove: ");
             String isbn = sc.nextLine();
-            String sql = "DELETE FROM finallibrary.Book WHERE ISBN = ?";
+            String sql = "UPDATE finallibrary.Book SET Availability = 'notavailable' WHERE ISBN = ?";
             try (Connection conn = DataBaseutils.getConnection();
                  PreparedStatement statement = conn.prepareStatement(sql)) {
                 statement.setString(1, isbn);
                 int rowsAffected = statement.executeUpdate();
                 if (rowsAffected > 0) {
-                    System.out.println("Book removed successfully");
-                    return; // Exit the method after successful removal
+                    System.out.println("Book availability set to inactive successfully");
+                    return; // Exit the method after successful update
                 } else {
                     System.out.println("No book with that ISBN exists in the database");
                     attempts++;
@@ -213,13 +216,14 @@ public class Admin extends Person {
                     System.out.println("You have " + (MAX_ATTEMPTS - attempts) + " attempts left.");
                 }
             } catch (SQLException e) {
-                System.out.println("Error removing book from the database.");
+                System.out.println("Error removing book availability from the database.");
                 e.printStackTrace();
                 throw new RuntimeException(e);
             }
         }
         System.out.println("Maximum attempts reached. Exiting removal process.");
     }
+
 
     public void removePolicy() {
         System.out.println("Enter policy to be removed: ");
@@ -235,11 +239,11 @@ public class Admin extends Person {
     }
 
 
-    public static void updateBook() throws SQLException {
+    public static void updateBook() throws SQLException, SqlConnectionException {
+        viewBooks();
         Scanner sc = new Scanner(System.in);
         int attempts = 0;
         final int MAX_ATTEMPTS = 3;
-        Date publishedDate = null;
         while (attempts < MAX_ATTEMPTS) {
             try {
                 System.out.println("Enter the ISBN of the book you want to update: ");
@@ -258,52 +262,98 @@ public class Admin extends Person {
                 }
 
                 // Continue with the update process
-                System.out.println("Enter the new title of the book: ");
-                String title = sc.nextLine();
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+                System.out.println("Select the field you want to update:");
+                System.out.println("1. Published Date");
+                System.out.println("2. Languages (Add new language)");
+                System.out.println("3. Genre");
+                System.out.println("4. Rack Number");
+                System.out.println("5. Publisher Name");
+                System.out.println("6. Publisher Details");
+                System.out.println("7. Author Name");
+                System.out.println("8. Author Details");
+                System.out.println("9. Type of Book");
+                System.out.println("10. Number of Copies");
+                System.out.println("11. Exit update process");
 
-                boolean validDate = false;
-                while (!validDate) {
-                    try {
-                        System.out.println("Enter the published date of the book (in dd/MM/yyyy format): ");
-                        String inputDateStr = sc.nextLine();
-                        LocalDate parsedDate = LocalDate.parse(inputDateStr, formatter);
-                        publishedDate = java.sql.Date.valueOf(parsedDate);
-                        validDate = true;
-                    } catch (DateTimeParseException e) {
-                        System.out.println("Error: Invalid date format. Please enter the date in dd/MM/yyyy format.");
-                        // Ask for date input again
-                    }
+                int choice = Integer.parseInt(sc.nextLine()); // Use nextLine and parse to avoid Scanner issues
+
+                String sql = "UPDATE finallibrary.Book SET %s = ? WHERE ISBN = ?";
+                String field = "";
+                Object value = null;
+
+                switch (choice) {
+                    case 1:
+                        System.out.println("Enter the new published date of the book (in yyyy-MM-dd format): ");
+                        String dateStr = sc.nextLine();
+                        LocalDate date = LocalDate.parse(dateStr); // Default ISO_LOCAL_DATE format is yyyy-MM-dd
+                        value = Date.valueOf(date);
+                        field = "PublishedDate";
+                        break;
+                    case 2:
+                        System.out.println("Enter the new language to add to the book: ");
+                        value = sc.nextLine();
+                        field = "Languages"; // Assuming you want to replace the entire languages field
+                        break;
+                    case 3:
+                        System.out.println("Enter the new genre of the book: ");
+                        value = sc.nextLine();
+                        field = "Genre";
+                        break;
+                    case 4:
+                        System.out.println("Enter the new rack number of the book: ");
+                        value = sc.nextLine();
+                        field = "RackNo";
+                        break;
+                    case 5:
+                        System.out.println("Enter the new publisher name of the book: ");
+                        value = sc.nextLine();
+                        field = "PublisherName";
+                        break;
+                    case 6:
+                        System.out.println("Enter the new publisher details of the book: ");
+                        value = sc.nextLine();
+                        field = "PublisherDetails";
+                        break;
+                    case 7:
+                        System.out.println("Enter the new author name of the book: ");
+                        value = sc.nextLine();
+                        field = "AuthorName";
+                        break;
+                    case 8:
+                        System.out.println("Enter the new author details of the book: ");
+                        value = sc.nextLine();
+                        field = "AuthorDetails";
+                        break;
+                    case 9:
+                        System.out.println("Enter the new type of book: ");
+                        value = sc.nextLine();
+                        field = "TypeOfBook";
+                        break;
+                    case 10:
+                        System.out.println("Enter the new number of copies: ");
+                        value = Integer.parseInt(sc.nextLine()); // Use nextLine and parse to avoid Scanner issues
+                        field = "Copies";
+                        break;
+                    case 11:
+                        System.out.println("Exiting update process.");
+                        return;
+                    default:
+                        System.out.println("Invalid choice. Please enter a number between 1 and 11.");
+                        continue;
                 }
-                System.out.println("Enter the new languages of the book: ");
-                String languages = sc.nextLine();
-                System.out.println("Enter the new genre of the book: ");
-                String genre = sc.nextLine();
-                System.out.println("Enter the new rack number of the book: ");
-                String rackNo = sc.nextLine();
-                System.out.println("Enter the new publisher name of the book: ");
-                String publisherName = sc.nextLine();
-                System.out.println("Enter the new publisher details of the book: ");
-                String publisherDetails = sc.nextLine();
-                System.out.println("Enter the new author name of the book: ");
-                String authorName = sc.nextLine();
-                System.out.println("Enter the new author details of the book: ");
-                String authorDetails = sc.nextLine();
 
-                String sql = "UPDATE finallibrary.Book SET Title = ?, PublishedDate = ?, Languages = ?, Genre = ?, RackNo = ?, publishername = ?, publisherDetails = ?, Authorname = ?, AuthorDetails = ? WHERE ISBN = ?";
+                sql = String.format(sql, field); // Format the SQL string with the chosen field
 
                 try (Connection conn = DataBaseutils.getConnection();
                      PreparedStatement statement = conn.prepareStatement(sql)) {
-                    statement.setString(1, title);
-                    statement.setDate(2, publishedDate);
-                    statement.setString(3, languages);
-                    statement.setString(4, genre);
-                    statement.setString(5, rackNo);
-                    statement.setString(6, publisherName);
-                    statement.setString(7, publisherDetails);
-                    statement.setString(8, authorName);
-                    statement.setString(9, authorDetails);
-                    statement.setString(10, isbn);
+                    if (value instanceof Date) {
+                        statement.setDate(1, (Date) value);
+                    } else if (value instanceof Integer) {
+                        statement.setInt(1, (Integer) value);
+                    } else if (value instanceof String) {
+                        statement.setString(1, (String) value);
+                    }
+                    statement.setString(2, isbn);
 
                     int rowsAffected = statement.executeUpdate();
                     if (rowsAffected > 0) {
@@ -316,8 +366,12 @@ public class Admin extends Person {
                     System.out.println("Error updating book in the database.");
                     e.printStackTrace();
                 }
+            } catch (DateTimeParseException e) {
+                System.out.println("Invalid date format. Please use yyyy-MM-dd format.");
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid input. Please enter a valid number.");
             } catch (Exception e) {
-                System.out.println(e.getMessage());
+                System.out.println("An error occurred: " + e.getMessage());
             }
         }
         System.out.println("Maximum attempts reached. Exiting update process.");
@@ -560,5 +614,7 @@ public class Admin extends Person {
         //viewAccounts();
         //addLibrary();
         //addAdmin();
+        //removeBook();
+        updateBook();
     }
 }
